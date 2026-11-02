@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>暖心一句話</title>
+<style>
+:root{--bg:#f1eeff;--ink:#2b2250;--card:#fff;--purple:#6c4ef2;--mint:#1fb996;--sun:#ffbf3c;--muted:#5d5880;--line:#2b2250}
+@media (prefers-color-scheme: dark){:root{--bg:#171233;--ink:#f1eeff;--card:#251e4a;--muted:#b4aedc;--line:#f1eeff;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans TC","PingFang TC",sans-serif;line-height:1.5;padding:16px;padding-bottom:40px}
+main{max-width:560px;margin:0 auto;display:grid;gap:14px}
+h1{margin:0;font-size:28px}
+.panel{background:var(--card);border:3px solid var(--line);border-radius:18px;padding:16px}
+button,input,textarea{font:inherit}
+button{font-weight:700;font-size:18px;border:3px solid var(--line);border-radius:12px;padding:12px 20px;background:var(--sun);color:#2b2250;cursor:pointer;box-shadow:3px 3px 0 var(--line);width:100%}
+button:disabled{opacity:.5}
+input,textarea{width:100%;border:3px solid var(--line);border-radius:12px;padding:12px;background:var(--card);color:var(--ink);font-size:18px;margin-bottom:12px}
+textarea{min-height:120px}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:4px solid var(--mint);outline-offset:2px}
+.bubble{background:var(--purple);color:#fff;border-radius:20px 20px 20px 4px;padding:14px 18px;font-size:20px;font-weight:700}
+.av{font-size:56px;line-height:1;margin-bottom:6px}
+.clock{font-size:34px;font-weight:900;color:var(--purple)}
+.muted{color:var(--muted)}.hide{display:none}
+.opt{display:block;text-align:left;background:var(--card);color:var(--ink);margin-bottom:10px;font-size:19px}
+.opt.sel{background:var(--mint);color:#fff}
+.big{font-size:56px;font-weight:900;color:var(--mint);line-height:1.1}
+.msg{color:#c0392b;min-height:1.5em}
+</style>
+</head>
+<body>
+<main>
+  <h1>暖心一句話</h1>
+
+  <section class="panel" id="join">
+    <p>輸入你的名字（或座號）加入遊戲</p>
+    <input id="pin" inputmode="numeric" maxlength="4" placeholder="遊戲代碼（4 位數字）" autocomplete="off">
+    <input id="nm" maxlength="10" placeholder="你的名字，例如：5號小明" autocomplete="off">
+    <button id="go">加入</button>
+    <div class="msg" id="jmsg"></div>
+  </section>
+
+  <section class="panel hide" id="wait">
+    <div class="big" id="wHi"></div>
+    <p id="wMsg" class="muted"></p>
+  </section>
+
+  <section class="panel hide" id="write">
+    <div class="av" id="wAv"></div>
+    <div class="bubble" id="wSit"></div>
+    <p><b>你會對他說什麼？</b> <span class="clock" id="clk"></span></p>
+    <textarea id="txt" maxlength="120" placeholder="寫下你想對他說的話（最多 120 字）"></textarea>
+    <button id="send">送出</button>
+    <p class="muted" id="sent"></p>
+  </section>
+
+  <section class="panel hide" id="vote">
+    <div class="bubble" id="vSit"></div>
+    <p><b>哪一句最讓人覺得被理解？</b> <span class="clock" id="vclk"></span></p>
+    <div id="opts"></div>
+    <p class="muted" id="vmsg"></p>
+  </section>
+
+  <section class="panel hide" id="res">
+    <div class="big" id="rBig"></div>
+    <p id="rTxt"></p>
+    <div id="rTop"></div>
+  </section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+let id=localStorage.getItem('emoId'),off=0,deadline=0,phase='',round=-1,es=null,gotText=false;
+function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+const show=n=>['join','wait','write','vote','res'].forEach(x=>$(x).classList.toggle('hide',x!==n));
+
+async function post(u,o){const r=await fetch(u,{method:'POST',body:JSON.stringify(o)});return r.json()}
+async function join(name){
+  const r=await post('/api/join',{id,name,pin:$('pin').value.trim()});
+  if(r.error){$('jmsg').textContent=r.error;return false}
+  id=r.id;localStorage.setItem('emoId',id);connect();return true;
+}
+$('go').onclick=()=>{const n=$('nm').value.trim();if(!n){$('jmsg').textContent='請先輸入名字';return}join(n)};
+$('nm').onkeydown=e=>{if(e.key==='Enter')$('go').click()};
+if(id){post('/api/join',{id}).then(r=>{if(r.id)connect();else{localStorage.removeItem('emoId');id=null}})}
+
+function connect(){
+  if(es)es.close();
+  es=new EventSource('/events?id='+id);
+  es.onmessage=e=>render(JSON.parse(e.data));
+  es.onerror=()=>{if(es.readyState===2){localStorage.removeItem('emoId');id=null;show('join')}};
+}
+function fmt(s){return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+setInterval(()=>{if(!deadline)return;const t=fmt(Math.max(0,Math.ceil((deadline-(Date.now()+off))/1000)));$('clk').textContent='⏱ '+t;$('vclk').textContent='⏱ '+t},250);
+
+$('send').onclick=async()=>{
+  const t=$('txt').value.trim();if(!t)return;
+  $('send').disabled=true;
+  const r=await post('/api/submit',{id,text:t});
+  $('sent').textContent=r.ok?'✅ 已送出！時間內可以修改後再按一次。':'現在不能送出了。';
+  $('send').disabled=false;
+};
+
+function render(m){
+  if(m.gone){localStorage.removeItem('emoId');id=null;show('join');return}
+  off=m.now-Date.now();deadline=m.deadline;
+  const newStage=m.phase!==phase||m.round!==round;
+  phase=m.phase;round=m.round;
+  if(m.phase==='lobby'||m.phase==='review'){
+    show('wait');$('wHi').textContent=m.me.name;
+    $('wMsg').textContent=m.phase==='lobby'?(m.round?'本題結束。總分：'+m.me.total+' 分。等老師出下一題！':'已加入！等老師開始…'):'老師正在整理大家的回答…';
+  }
+  if(m.phase==='writing'){
+    show('write');$('wAv').textContent=m.situation.emoji;$('wSit').textContent=m.situation.text;
+    if(newStage){$('txt').value=m.me.text||'';$('sent').textContent=m.me.text?'✅ 已送出':''}
+  }
+  if(m.phase==='voting'){
+    show('vote');$('vSit').textContent=m.situation.text;
+    const box=$('opts');
+    if(newStage||!box.childNodes.length){
+      box.textContent='';
+      m.options.forEach(o=>{const b=el('button','opt',o.text);b.dataset.aid=o.aid;
+        b.onclick=async()=>{const r=await post('/api/vote',{id,aid:o.aid});if(!r.ok)$('vmsg').textContent='投票失敗'};box.appendChild(b)});
+      if(!m.options.length)$('vmsg').textContent='這一輪沒有可以投的回答，等一下！';
+    }
+    [...box.children].forEach(b=>{b.classList.toggle('sel',b.dataset.aid===m.me.vote);b.disabled=m.me.voted});
+    if(m.me.voted)$('vmsg').textContent='✅ 已投票，等大家投完！';
+  }
+  if(m.phase==='results'){
+    show('res');
+    const done=m.reveal>=m.top.length;
+    $('rBig').textContent=done&&m.me.rank?(m.me.rank<=3?['🥇','🥈','🥉'][m.me.rank-1]+' 第 '+m.me.rank+' 名':'你得到 '+m.me.votes+' 票'):'本題得分 +'+m.me.roundPts;
+    $('rTxt').textContent='本題 +'+m.me.roundPts+' 分，總分 '+m.me.total+' 分'+(done?'，目前第 '+m.me.place+' 名':'');
+    const t=$('rTop');t.textContent='';
+    m.top.slice().reverse().slice(0,m.reveal).reverse().forEach(a=>{
+      const d=el('p');d.appendChild(el('b',null,(a.rank<=3?['🥇','🥈','🥉'][a.rank-1]:'第'+a.rank+'名')+' '+a.name+'：'));d.appendChild(document.createTextNode(a.text));t.appendChild(d)});
+  }
+}
+</script>
+</body>
+</html>

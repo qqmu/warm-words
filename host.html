@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>暖心一句話・老師控制台</title>
+<style>
+:root{--bg:#f1eeff;--ink:#2b2250;--card:#fff;--purple:#6c4ef2;--mint:#1fb996;--sun:#ffbf3c;--muted:#5d5880;--line:#2b2250}
+@media (prefers-color-scheme: dark){:root{--bg:#171233;--ink:#f1eeff;--card:#251e4a;--muted:#b4aedc;--line:#f1eeff;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;line-height:1.5;padding:22px}
+main{max-width:1100px;margin:0 auto;display:grid;gap:18px}
+h1{margin:0;font-size:clamp(28px,4vw,40px)}h2{margin:0 0 10px;font-size:20px}
+.panel{background:var(--card);border:3px solid var(--line);border-radius:20px;padding:20px}
+button{font:inherit;font-weight:700;font-size:18px;border:3px solid var(--line);border-radius:12px;padding:10px 22px;background:var(--sun);color:#2b2250;cursor:pointer;box-shadow:3px 3px 0 var(--line)}
+button.alt{background:var(--card);color:var(--ink)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,select:focus-visible,textarea:focus-visible{outline:4px solid var(--mint);outline-offset:2px}
+select,textarea{font:inherit;border:3px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);padding:10px;width:100%}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.url{font-size:clamp(28px,5vw,52px);font-weight:900;color:var(--purple);word-break:break-all}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{border:2px solid var(--line);border-radius:20px;padding:2px 12px;font-size:16px}
+.chip.off{opacity:.4}
+.scene{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center}
+.avatar{font-size:clamp(70px,10vw,120px);line-height:1}
+.bubble{background:var(--purple);color:#fff;border-radius:22px 22px 22px 4px;padding:18px 24px;font-size:clamp(22px,3.4vw,34px);font-weight:700}
+.big{font-size:clamp(44px,7vw,80px);font-weight:900;color:var(--purple)}
+.muted{color:var(--muted)}
+.hide{display:none}
+.ans{display:grid;grid-template-columns:1fr auto;gap:10px;padding:8px 0;border-bottom:2px dashed rgba(127,127,127,.4);align-items:center}
+.ans.hid .t{text-decoration:line-through;opacity:.45}
+.ans button{font-size:15px;padding:4px 12px}
+.card{display:grid;grid-template-columns:80px 1fr auto;gap:14px;align-items:center;border:3px solid var(--line);border-radius:18px;padding:14px;margin-bottom:12px}
+.card.r1{background:var(--sun);color:#2b2250}
+.medal{font-size:42px;text-align:center;font-weight:900}
+.say{font-size:clamp(20px,3vw,28px);font-weight:700}
+.pts{font-size:40px;font-weight:900;color:var(--mint);text-align:right}.card.r1 .pts{color:#2b2250}
+.pts small{font-size:16px}
+table{width:100%;border-collapse:collapse;font-size:18px}td,th{padding:6px 10px;text-align:left;border-bottom:2px dashed rgba(127,127,127,.4)}
+</style>
+</head>
+<body>
+<main>
+  <header class="row" style="justify-content:space-between">
+    <h1>暖心一句話</h1>
+    <div class="muted" id="roundLabel"></div>
+  </header>
+
+  <!-- 大廳 -->
+  <section class="panel" id="lobby">
+    <h2>學生加入方式：手機連上學校 Wi-Fi，打開下面的網址</h2>
+    <div id="urls" class="url">讀取中…</div>
+    <h2 style="margin-top:14px">遊戲代碼</h2>
+    <div class="url" id="pin"></div>
+    <div class="muted" id="count" style="margin-top:6px"></div>
+    <div class="chips" id="chips"></div>
+    <hr style="margin:20px 0;border:1px dashed var(--muted)">
+    <h2>選一個情境</h2>
+    <select id="pick" aria-label="情境"></select>
+    <textarea id="custom" class="hide" style="margin-top:10px;min-height:70px" placeholder="例如：小明練習了很久的演講，上台卻忘詞了。"></textarea>
+    <div class="scene" style="margin-top:14px"><div class="avatar" id="pAv"></div><div class="bubble" id="pTxt"></div></div>
+    <div class="row" style="margin-top:16px">
+      <label>作答時間 <select id="secs" style="width:auto"><option value="120">2 分鐘</option><option value="180" selected>3 分鐘</option><option value="240">4 分鐘</option></select></label>
+      <button id="start">開始作答</button>
+      <button class="alt" id="reset">全部重來</button>
+    </div>
+    <p class="muted" id="boardNote"></p>
+  </section>
+
+  <!-- 作答 -->
+  <section class="panel hide" id="writing">
+    <div class="scene"><div class="avatar" class="av"></div><div class="bubble" id="wTxt"></div></div>
+    <h2 style="margin-top:16px">如果你是他的朋友，你會對他說什麼？</h2>
+    <div class="row"><span class="big" id="wClock"></span><span class="big" style="color:var(--mint)" id="wCount"></span><button id="endW" class="alt">提早結束</button></div>
+  </section>
+
+  <!-- 審核 -->
+  <section class="panel hide" id="review">
+    <h2>老師審核：點「不顯示」可以拿掉不適合的回答（學生看不到名字，只有老師看得到）</h2>
+    <div id="rList"></div>
+    <div class="row" style="margin-top:14px"><label>投票時間 <select id="vsecs" style="width:auto"><option value="45">45 秒</option><option value="60" selected>1 分鐘</option><option value="90">1.5 分鐘</option></select></label><button id="startV">開始投票</button></div>
+  </section>
+
+  <!-- 投票 -->
+  <section class="panel hide" id="voting">
+    <h2>請看自己的手機，投給「最讓人覺得被理解」的一句話</h2>
+    <div class="row"><span class="big" id="vClock"></span><span class="big" style="color:var(--mint)" id="vCount"></span><button id="endV" class="alt">提早結束</button></div>
+  </section>
+
+  <!-- 結果 -->
+  <section class="panel hide" id="results">
+    <h2>暖心排行榜</h2>
+    <div class="row" style="margin-bottom:14px"><button id="rev">揭曉下一名</button><button id="nextR" class="alt">下一題</button></div>
+    <div id="cards"></div>
+    <div id="boardBox" class="hide"><h2 style="margin-top:20px">總積分榜</h2><table id="board"></table></div>
+  </section>
+</main>
+
+<script>
+let KEY=new URLSearchParams(location.search).get('key')||localStorage.getItem('emoKey')||'';
+if(!KEY)KEY=(prompt('請輸入老師密碼')||'').trim();
+if(KEY)localStorage.setItem('emoKey',KEY);
+const $=id=>document.getElementById(id);
+const S=[
+ {emoji:'😢',name:'小宇',text:'小宇練習了兩個月的接力賽，最後一棒不小心掉棒，全班輸了比賽。'},
+ {emoji:'😔',name:'小美',text:'小美最好的朋友轉到別班，下課時她一個人坐在教室裡。'},
+ {emoji:'😟',name:'阿傑',text:'阿傑很認真準備考試，成績還是不及格，今天要把考卷拿給媽媽簽名。'},
+ {emoji:'😣',name:'小晴',text:'有人誤傳小晴說了別人的壞話，現在很多同學都不理她。'},
+ {emoji:'😰',name:'小凱',text:'老師選小凱代表全班上台演講，他緊張到晚上睡不著。'},
+ {emoji:'🥺',name:'小安',text:'小安剛轉學，到校第一天，沒有人過來跟他說話。'},
+ {emoji:'😭',name:'小彤',text:'小彤養了五年的小狗昨天過世了，今天她還是來上學。'},
+ {emoji:'😞',name:'阿宏',text:'同學幫阿宏取了一個難聽的綽號，大家都在笑。'},
+ {emoji:'✏️',name:'自己設定',text:''}
+];
+S.forEach((s,i)=>{const o=document.createElement('option');o.value=i;o.textContent=s.name+(s.text?'：'+s.text.slice(0,20)+'…':'');$('pick').appendChild(o)});
+function chosen(){const s=S[+$('pick').value];return {...s,text:s.text||$('custom').value.trim()}}
+function preview(){const s=chosen();$('custom').classList.toggle('hide',+$('pick').value!==S.length-1);$('pAv').textContent=s.emoji;$('pTxt').textContent=s.text||'請輸入情境'}
+$('pick').onchange=preview;$('custom').oninput=preview;preview();
+
+async function act(o){const r=await fetch('/api/host',{method:'POST',body:JSON.stringify({key:KEY,...o})});return r.json()}
+$('start').onclick=()=>{const s=chosen();if(!s.text)return alert('請先輸入情境');act({action:'start',situation:s,seconds:+$('secs').value})};
+$('reset').onclick=()=>{if(confirm('會清除所有學生和積分，確定嗎？'))act({action:'reset'})};
+$('endW').onclick=()=>act({action:'endWriting'});
+$('startV').onclick=()=>act({action:'startVoting',seconds:+$('vsecs').value});
+$('endV').onclick=()=>act({action:'endVoting'});
+$('rev').onclick=()=>act({action:'reveal'});
+$('nextR').onclick=()=>act({action:'next'});
+
+let off=0,deadline=0,M=null,lastPhase='';
+function secLeft(){return Math.max(0,Math.ceil((deadline-(Date.now()+off))/1000))}
+function fmt(s){return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+setInterval(()=>{if(!deadline)return;const t=fmt(secLeft());$('wClock').textContent='⏱ '+t;$('vClock').textContent='⏱ '+t},250);
+function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+
+function render(m){
+  M=m;off=m.now-Date.now();deadline=m.deadline;
+  ['lobby','writing','review','voting','results'].forEach(p=>$(p).classList.toggle('hide',p!==m.phase));
+  $('roundLabel').textContent=m.round?'第 '+m.round+' 題':'';
+  if(m.phase==='lobby'){
+    const local=['localhost','127.0.0.1'].includes(location.hostname);
+    const urls=local?m.urls:[location.origin];
+    $('urls').textContent=urls.length?urls.join('　'):'找不到網路，請確認已連上 Wi-Fi';
+    $('pin').textContent=m.pin;
+    $('count').textContent='已加入 '+m.players.length+' 人';
+    $('chips').textContent='';
+    m.players.forEach(p=>$('chips').appendChild(el('span','chip'+(p.on?'':' off'),p.name)));
+    $('boardNote').textContent=m.round?'已完成 '+m.round+' 題，積分會累計。':'';
+  }
+  if(m.situation){document.querySelectorAll('.avatar').forEach(a=>{if(a.id!=='pAv')a.textContent=m.situation.emoji});$('wTxt').textContent=m.situation.text}
+  if(m.phase==='writing')$('wCount').textContent='已交 '+m.submitted+' / '+m.players.length;
+  if(m.phase==='review'){
+    const l=$('rList');l.textContent='';
+    if(!m.answers.length)l.appendChild(el('p','muted','沒有人交答案。'));
+    m.answers.forEach(a=>{
+      const r=el('div','ans'+(a.hidden?' hid':''));
+      const t=el('div','t');t.appendChild(el('b',null,a.name+'：'));t.appendChild(document.createTextNode(a.text));
+      const b=el('button','alt',a.hidden?'恢復':'不顯示');b.onclick=()=>act({action:'hide',aid:a.aid});
+      r.appendChild(t);r.appendChild(b);l.appendChild(r);
+    });
+  }
+  if(m.phase==='voting')$('vCount').textContent='已投 '+m.voted+' / '+m.eligible;
+  if(m.phase==='results'){
+    const c=$('cards');c.textContent='';
+    if(!m.top.length)c.appendChild(el('p','muted','這題沒有人得票。'));
+    const shown=m.top.slice().reverse().slice(0,m.reveal).reverse();
+    shown.forEach(a=>{
+      const d=el('div','card'+(a.rank===1?' r1':''));
+      d.appendChild(el('div','medal',a.rank===1?'🥇':a.rank===2?'🥈':a.rank===3?'🥉':'第'+a.rank));
+      const b=el('div');b.appendChild(el('div','muted',a.name));b.appendChild(el('div','say','「'+a.text+'」'));d.appendChild(b);
+      const p=el('div','pts',a.votes+' 票');d.appendChild(p);c.appendChild(d);
+    });
+    const done=m.reveal>=m.top.length;
+    $('rev').disabled=done;$('rev').textContent=done?'揭曉完畢':'揭曉下一名';
+    $('boardBox').classList.toggle('hide',!done);
+    if(done){const t=$('board');t.textContent='';const h=el('tr');['名次','名字','本題','總分'].forEach(x=>h.appendChild(el('th',null,x)));t.appendChild(h);
+      m.board.forEach((p,i)=>{const r=el('tr');[i+1,p.name,'+'+p.roundPts,p.total].forEach(x=>r.appendChild(el('td',null,String(x))));t.appendChild(r)})}
+  }
+}
+const es=new EventSource('/events?role=host&key='+encodeURIComponent(KEY));
+es.onmessage=e=>render(JSON.parse(e.data));
+es.onerror=()=>{if(es.readyState===2){localStorage.removeItem('emoKey');document.body.insertAdjacentHTML('afterbegin','<p style="color:#c00;font-size:20px">連線失敗或老師密碼不對。<a href="/host">重新輸入密碼</a></p>')}};
+</script>
+</body>
+</html>

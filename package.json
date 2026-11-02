@@ -1,0 +1,8 @@
+{
+  "name": "warm-words",
+  "version": "1.0.0",
+  "description": "暖心一句話：教室即時競賽",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" }
+}
