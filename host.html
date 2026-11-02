@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>暖心一句話・老師控制台</title>
+<title>我最有同理心！・老師控制台</title>
 <style>
 :root{--bg:#f1eeff;--ink:#2b2250;--card:#fff;--purple:#6c4ef2;--mint:#1fb996;--sun:#ffbf3c;--muted:#5d5880;--line:#2b2250}
 @media (prefers-color-scheme: dark){:root{--bg:#171233;--ink:#f1eeff;--card:#251e4a;--muted:#b4aedc;--line:#f1eeff;color-scheme:dark}}
@@ -43,7 +43,7 @@ table{width:100%;border-collapse:collapse;font-size:18px}td,th{padding:6px 10px;
 <body>
 <main>
   <header class="row" style="justify-content:space-between">
-    <h1>暖心一句話</h1>
+    <h1>我最有同理心！</h1>
     <div class="muted" id="roundLabel"></div>
   </header>
 
@@ -168,7 +168,7 @@ function render(m){
       const d=el('div','card'+(a.rank===1?' r1':''));
       d.appendChild(el('div','medal',a.rank===1?'🥇':a.rank===2?'🥈':a.rank===3?'🥉':'第'+a.rank));
       const b=el('div');b.appendChild(el('div','muted',a.name));b.appendChild(el('div','say','「'+a.text+'」'));d.appendChild(b);
-      const p=el('div','pts',a.votes+' 票');d.appendChild(p);c.appendChild(d);
+      const p=el('div','pts',a.votes+' 票');p.appendChild(el('small',null,'　+'+a.pts+' 分'));d.appendChild(p);c.appendChild(d);
     });
     const done=m.reveal>=m.top.length;
     $('rev').disabled=done;$('rev').textContent=done?'揭曉完畢':'揭曉下一名';

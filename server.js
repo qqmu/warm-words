@@ -1,4 +1,4 @@
-// 暖心一句話：教室即時競賽伺服器（不需要安裝任何套件，只要有 Node.js）
+// 我最有同理心：教室即時競賽伺服器（不需要安裝任何套件，只要有 Node.js）
 const http = require('http');
 const fs = require('fs');
 const os = require('os');
@@ -30,6 +30,11 @@ function ips() {
   return out.map(ip => `http://${ip}:${PORT}`);
 }
 
+// 名次積分：最高票 100、第二 80、第三 70、第四 60、第五 50、第六 40（同票同名次、同分）
+const PTS = { 1: 100, 2: 80, 3: 70, 4: 60, 5: 50, 6: 40 };
+const ptsOf = a => (a.votes > 0 ? PTS[a.rank] || 0 : 0);
+const topList = () => G.ranking.filter(a => a.votes > 0 && a.rank <= 6).slice(0, 10);
+
 function tally() {
   const vis = G.answers.filter(a => !a.hidden);
   vis.sort((a, b) => b.votes - a.votes);
@@ -38,7 +43,7 @@ function tally() {
   G.ranking = vis;
   for (const p of G.players.values()) {
     const ans = G.answers.find(a => a.pid === p.id);
-    p.roundPts = (ans ? 50 : 0) + (ans && !ans.hidden ? ans.votes * 100 : 0) + (p.vote != null ? 20 : 0);
+    p.roundPts = ans && !ans.hidden ? 10 + ptsOf(ans) : 0; // 交答案 +10，再加名次分
     p.total += p.roundPts;
   }
 }
@@ -65,14 +70,14 @@ function viewHost() {
   const submitted = G.answers.length;
   const board = [...G.players.values()].sort((a, b) => b.total - a.total).slice(0, 10)
     .map(p => ({ name: p.name, total: p.total, roundPts: p.roundPts }));
-  const top = G.ranking.filter(a => a.votes > 0).slice(0, 5);
+  const top = topList();
   return {
     role: 'host', pin: G.pin, phase: G.phase, round: G.round, situation: G.situation, deadline: G.deadline,
     urls: ips(), players: [...G.players.values()].map(p => ({ name: p.name, on: p.on })),
     submitted, voted: votedCount(), eligible: eligible(), reveal: G.reveal,
     answers: ['review', 'voting', 'results'].includes(G.phase)
       ? G.answers.map(a => ({ aid: a.aid, name: G.players.get(a.pid)?.name, text: a.text, hidden: a.hidden })) : [],
-    top: top.map(a => ({ rank: a.rank, name: G.players.get(a.pid)?.name, text: a.text, votes: a.votes })),
+    top: top.map(a => ({ rank: a.rank, name: G.players.get(a.pid)?.name, text: a.text, votes: a.votes, pts: ptsOf(a) })),
     board
   };
 }
@@ -88,9 +93,9 @@ function viewPlayer(pid) {
   if (G.phase === 'voting')
     v.options = p.options.map(aid => ({ aid, text: G.answers.find(a => a.aid === aid)?.text || '' }));
   if (G.phase === 'results') {
-    const top = G.ranking.filter(a => a.votes > 0).slice(0, 5);
+    const top = topList();
     v.reveal = G.reveal;
-    v.top = top.map(a => ({ rank: a.rank, name: G.players.get(a.pid)?.name, text: a.text, votes: a.votes }));
+    v.top = top.map(a => ({ rank: a.rank, name: G.players.get(a.pid)?.name, text: a.text, votes: a.votes, pts: ptsOf(a) }));
     v.me.roundPts = p.roundPts;
     v.me.rank = mine && !mine.hidden ? mine.rank : null;
     v.me.votes = mine ? mine.votes : 0;
@@ -224,7 +229,7 @@ http.createServer(async (req, res) => {
   res.writeHead(404); res.end();
 }).listen(PORT, '0.0.0.0', () => {
   const hostUrl = `http://localhost:${PORT}/host?key=${KEY}`;
-  console.log('\n=== 暖心一句話 已啟動 ===');
+  console.log('\n=== 我最有同理心 已啟動 ===');
   console.log('老師控制台（已自動開啟）：' + hostUrl);
   console.log('學生請用手機連同一個 Wi-Fi，打開：');
   ips().forEach(u => console.log('   ' + u));
