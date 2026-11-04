@@ -54,9 +54,9 @@ function assignOptions() {
   let k = 0;
   for (const p of G.players.values()) {
     const own = mine(p.id), opts = [];
-    const want = Math.min(6, vis.filter(x => !own.has(x)).length);
+    const want = Math.min(8, vis.filter(x => !own.has(x)).length);
     for (let j = 0; opts.length < want && j < vis.length * 2; j++) {
-      const aid = vis[(k * 6 + j) % vis.length];
+      const aid = vis[(k * 8 + j) % vis.length];
       if (!own.has(aid) && !opts.includes(aid)) opts.push(aid);
     }
     p.options = opts; p.vote = null; k++;
@@ -77,7 +77,7 @@ function viewHost() {
     submitted, voted: votedCount(), eligible: eligible(), reveal: G.reveal,
     answers: ['review', 'voting', 'results'].includes(G.phase)
       ? G.answers.map(a => ({ aid: a.aid, name: G.players.get(a.pid)?.name, text: a.text, hidden: a.hidden })) : [],
-    top: top.map(a => ({ rank: a.rank, name: G.players.get(a.pid)?.name, text: a.text, votes: a.votes, pts: ptsOf(a) })),
+    top: top.map(a => ({ rank: a.rank, name: G.players.get(a.pid)?.name, text: a.text, votes: a.votes, pts: ptsOf(a), ai: a.ai, comment: a.comment || '' })),
     board
   };
 }
@@ -95,7 +95,7 @@ function viewPlayer(pid) {
   if (G.phase === 'results') {
     const top = topList();
     v.reveal = G.reveal;
-    v.top = top.map(a => ({ rank: a.rank, name: G.players.get(a.pid)?.name, text: a.text, votes: a.votes, pts: ptsOf(a) }));
+    v.top = top.map(a => ({ rank: a.rank, name: G.players.get(a.pid)?.name, text: a.text, votes: a.votes, pts: ptsOf(a), ai: a.ai, comment: a.comment || '' }));
     v.me.roundPts = p.roundPts;
     v.me.rank = mine && !mine.hidden ? mine.rank : null;
     v.me.votes = mine ? mine.votes : 0;
@@ -149,6 +149,20 @@ function hostAction(b) {
     case 'startVoting': if (G.phase === 'review') goVoting(Math.max(20, Math.min(180, +b.seconds || 60))); return;
     case 'endVoting': if (G.phase === 'voting') goResults(); return;
     case 'reveal': if (G.phase === 'results') { G.reveal++; push(); } return;
+    case 'setAi': { // 貼上 Claude 的評分結果，只顯示，不計入總分
+      if (G.phase !== 'results') return '只能在揭曉結果時使用';
+      const m = String(b.text || '').match(/\[[\s\S]*\]/);
+      if (!m) return '找不到評分內容，請貼上 Claude 回覆的完整文字';
+      let arr; try { arr = JSON.parse(m[0]); } catch { return '格式有誤，請確認貼的是完整的 [ ... ]'; }
+      const targets = topList().filter(a => a.rank <= 5);
+      let ok = 0;
+      for (const x of arr) {
+        const a = targets[(+x.id) - 1], sc = Math.round(+x.score);
+        if (a && Number.isFinite(sc)) { a.ai = Math.max(0, Math.min(100, sc)); a.comment = clip(x.comment, 40); ok++; }
+      }
+      if (!ok) return '沒有對應到任何答案，請確認貼的是這一題的回覆';
+      push(); return;
+    }
     case 'next': G.phase = 'lobby'; G.deadline = 0; push(); return;
     case 'reset': G.phase = 'lobby'; G.round = 0; G.answers = []; G.ranking = []; G.players.clear(); G.pin = newPin(); push(); return;
     case 'kick': for (const [id, p] of G.players) if (p.name === b.name) G.players.delete(id); push(); return;
@@ -208,7 +222,7 @@ http.createServer(async (req, res) => {
       if (!p || G.phase !== 'writing' || !text) return json(res, { error: 'no' }, 400);
       const old = G.answers.find(a => a.pid === p.id);
       if (old) old.text = text;
-      else G.answers.push({ aid: rid(3), pid: p.id, text, hidden: false, votes: 0, rank: 0 });
+      else G.answers.push({ aid: rid(3), pid: p.id, text, hidden: false, votes: 0, rank: 0, ai: null, comment: '' });
       push(); return json(res, { ok: true });
     }
     if (u.pathname === '/api/vote') {

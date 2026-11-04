@@ -133,7 +133,7 @@ function render(m){
     $('rTxt').textContent='本題 +'+m.me.roundPts+' 分，總分 '+m.me.total+' 分'+(done?'，目前第 '+m.me.place+' 名':'');
     const t=$('rTop');t.textContent='';
     m.top.slice().reverse().slice(0,m.reveal).reverse().forEach(a=>{
-      const d=el('p');d.appendChild(el('b',null,(a.rank<=3?['🥇','🥈','🥉'][a.rank-1]:'第'+a.rank+'名')+' '+a.name+'：'));d.appendChild(document.createTextNode(a.text));t.appendChild(d)});
+      const d=el('p');d.appendChild(el('b',null,(a.rank<=3?['🥇','🥈','🥉'][a.rank-1]:'第'+a.rank+'名')+' '+a.name+'：'));d.appendChild(document.createTextNode(a.text));if(a.ai!=null)d.appendChild(el('span','muted','　🤖 AI '+a.ai+' 分（參考）'));t.appendChild(d)});
   }
 }
 </script>
